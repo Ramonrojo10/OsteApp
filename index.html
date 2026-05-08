@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OsteApp — Tibia & Peroné</title>
+<style>
+  :root {
+    --bone: #e8d5a3;
+    --bone-dark: #c4a46b;
+    --tibia: #4a9eff;
+    --fibula: #ff6b4a;
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --purple: #a371f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── HOME ── */
+  #screen-home { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; text-align: center; }
+  .logo { font-size: 4rem; margin-bottom: 0.5rem; }
+  .home-title { font-size: 2.8rem; font-weight: 800; background: linear-gradient(135deg, var(--tibia), var(--fibula)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .home-sub { color: var(--muted); margin: 0.5rem 0 2.5rem; font-size: 1.1rem; }
+  .mode-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; max-width: 700px; width: 100%; }
+  .mode-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.8rem 1.5rem; cursor: pointer; transition: all 0.2s; text-align: left; position: relative; overflow: hidden; }
+  .mode-card:hover { border-color: var(--tibia); transform: translateY(-3px); box-shadow: 0 8px 24px rgba(74,158,255,0.15); }
+  .mode-card.locked { opacity: 0.5; cursor: not-allowed; }
+  .mode-card.locked:hover { transform: none; border-color: var(--border); box-shadow: none; }
+  .mode-card .mode-num { font-size: 0.75rem; font-weight: 700; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+  .mode-card .mode-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
+  .mode-card .mode-name { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .mode-card .mode-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+  .lock-badge { position: absolute; top: 1rem; right: 1rem; background: var(--surface2); border-radius: 8px; padding: 2px 8px; font-size: 0.75rem; color: var(--muted); }
+  .complete-badge { position: absolute; top: 1rem; right: 1rem; background: var(--green); border-radius: 8px; padding: 2px 8px; font-size: 0.75rem; color: #000; font-weight: 700; }
+  .credits { margin-top: 2.5rem; font-size: 0.75rem; color: var(--muted); }
+  .credits a { color: var(--muted); }
+  .progress-bar-wrap { width: 100%; max-width: 700px; margin-bottom: 1.5rem; }
+  .progress-label { font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .progress-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--tibia), var(--fibula)); border-radius: 3px; transition: width 0.5s; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; min-height: 100vh; flex-direction: column; }
+  .screen.active { display: flex; }
+  .screen-header { display: flex; align-items: center; gap: 1rem; padding: 1.2rem 2rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .btn-back { background: none; border: 1px solid var(--border); color: var(--text); padding: 0.4rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: all 0.15s; }
+  .btn-back:hover { border-color: var(--tibia); color: var(--tibia); }
+  .screen-title { font-size: 1.2rem; font-weight: 700; }
+  .screen-body { flex: 1; padding: 2rem; max-width: 900px; margin: 0 auto; width: 100%; }
+
+  /* ── BUTTONS ── */
+  .btn { padding: 0.7rem 1.8rem; border-radius: 10px; border: none; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.15s; }
+  .btn-primary { background: linear-gradient(135deg, var(--tibia), #2266cc); color: #fff; }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--tibia); }
+  .btn-danger { background: var(--red); color: #fff; }
+
+  /* ── MODE 1: DOCTOR X-RAY ── */
+  #mode1-body { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+  .xray-container { position: relative; background: #111; border-radius: 16px; overflow: hidden; aspect-ratio: 9/16; max-height: 520px; display: flex; align-items: center; justify-content: center; cursor: crosshair; }
+  .xray-container img { width: 100%; height: 100%; object-fit: contain; filter: invert(1) brightness(0.85) contrast(1.1); }
+  .hotspot { position: absolute; width: 28px; height: 28px; border-radius: 50%; border: 2px solid; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; }
+  .hotspot:hover, .hotspot.active { transform: scale(1.3); }
+  .hotspot.tibia-hs { border-color: var(--tibia); background: rgba(74,158,255,0.2); color: var(--tibia); }
+  .hotspot.fibula-hs { border-color: var(--fibula); background: rgba(255,107,74,0.2); color: var(--fibula); }
+  .hotspot.tibia-hs:hover, .hotspot.tibia-hs.active { background: rgba(74,158,255,0.5); }
+  .hotspot.fibula-hs:hover, .hotspot.fibula-hs.active { background: rgba(255,107,74,0.5); }
+  .xray-panel { display: flex; flex-direction: column; gap: 1rem; }
+  .xray-info-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; min-height: 200px; }
+  .xray-info-box h3 { font-size: 1.1rem; margin-bottom: 0.4rem; }
+  .xray-info-box .tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.8rem; }
+  .tag-tibia { background: rgba(74,158,255,0.2); color: var(--tibia); }
+  .tag-fibula { background: rgba(255,107,74,0.2); color: var(--fibula); }
+  .xray-info-box p { font-size: 0.9rem; color: var(--muted); line-height: 1.6; }
+  .xray-info-box .fact { margin-top: 0.8rem; font-size: 0.8rem; background: var(--surface2); border-left: 3px solid var(--yellow); padding: 0.6rem 0.8rem; border-radius: 0 6px 6px 0; color: var(--text); }
+  .parts-list { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
+  .parts-list h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 0.8rem; }
+  .part-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; transition: background 0.15s; font-size: 0.85rem; }
+  .part-item:hover { background: var(--surface2); }
+  .part-item.visited { opacity: 0.5; }
+  .part-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .part-count { margin-top: 1rem; font-size: 0.8rem; color: var(--muted); text-align: center; }
+  .xray-view-btn { display: flex; gap: 0.5rem; }
+  .view-btn { flex: 1; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
+  .view-btn.active { border-color: var(--tibia); color: var(--tibia); background: rgba(74,158,255,0.1); }
+
+  /* ── MODE 2: ARMA EL ESQUELETO ── */
+  #mode2-body { text-align: center; }
+  .assembly-instructions { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+  .assembly-area { display: grid; grid-template-columns: 1fr 280px 1fr; gap: 1.5rem; align-items: start; }
+  .label-pool { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 200px; }
+  .label-pool h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 0.5rem; }
+  .drag-label { padding: 0.5rem 0.8rem; border-radius: 8px; border: 1px dashed var(--border); background: var(--surface2); cursor: grab; font-size: 0.8rem; user-select: none; transition: all 0.15s; }
+  .drag-label:hover { border-color: var(--tibia); color: var(--tibia); }
+  .drag-label.dragging { opacity: 0.4; }
+  .bone-diagram { position: relative; background: #0a0a0a; border-radius: 16px; padding: 1rem; }
+  .bone-diagram img { width: 100%; max-height: 480px; object-fit: contain; }
+  .drop-zone { position: absolute; width: 36px; height: 36px; border-radius: 50%; border: 2px dashed var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all 0.2s; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--tibia); background: rgba(74,158,255,0.2); }
+  .drop-zone.correct { border-color: var(--green); background: rgba(63,185,80,0.2); font-size: 0.6rem; text-align: center; color: var(--green); }
+  .drop-zone.wrong { border-color: var(--red); background: rgba(248,81,73,0.2); animation: shake 0.3s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+  .assembly-score { font-size: 1.1rem; font-weight: 700; }
+  .assembly-complete { background: var(--surface); border: 1px solid var(--green); border-radius: 12px; padding: 2rem; text-align: center; margin-top: 1.5rem; display: none; }
+  .assembly-complete h2 { color: var(--green); margin-bottom: 0.5rem; }
+
+  /* ── MODE 3: BONE VS BONE ── */
+  #mode3-body { max-width: 700px; margin: 0 auto; }
+  .players-header { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: center; margin-bottom: 2rem; }
+  .player-card { background: var(--surface); border: 2px solid var(--border); border-radius: 12px; padding: 1rem; text-align: center; transition: border-color 0.2s; }
+  .player-card.active { border-color: var(--tibia); }
+  .player-card .player-name { font-weight: 700; font-size: 1rem; }
+  .player-card .player-score { font-size: 2rem; font-weight: 800; margin-top: 0.3rem; }
+  .vs-badge { text-align: center; font-size: 1.5rem; font-weight: 900; color: var(--muted); }
+  .question-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; margin-bottom: 1.5rem; }
+  .q-category { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 0.8rem; }
+  .q-text { font-size: 1.2rem; font-weight: 600; line-height: 1.5; margin-bottom: 1.5rem; }
+  .q-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+  .q-opt { padding: 0.9rem 1rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; font-size: 0.9rem; transition: all 0.15s; text-align: left; color: var(--text); }
+  .q-opt:hover { border-color: var(--tibia); background: rgba(74,158,255,0.08); }
+  .q-opt.correct { border-color: var(--green); background: rgba(63,185,80,0.15); color: var(--green); }
+  .q-opt.wrong { border-color: var(--red); background: rgba(248,81,73,0.15); color: var(--red); }
+  .q-opt:disabled, .q-opt[disabled] { cursor: not-allowed; }
+  .turn-indicator { text-align: center; font-size: 0.9rem; color: var(--muted); margin-bottom: 1rem; }
+  .turn-indicator strong { color: var(--text); }
+  .q-counter { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+  .result-overlay { background: var(--surface); border: 2px solid var(--green); border-radius: 16px; padding: 3rem 2rem; text-align: center; }
+  .result-overlay h2 { font-size: 2rem; margin-bottom: 0.5rem; }
+  .result-scores { display: flex; justify-content: center; gap: 3rem; margin: 1.5rem 0; }
+  .result-score-item { text-align: center; }
+  .result-score-item .rs-name { font-size: 0.9rem; color: var(--muted); }
+  .result-score-item .rs-num { font-size: 3rem; font-weight: 900; }
+  .winner-highlight { color: var(--green); }
+  .mode3-setup { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; max-width: 400px; margin: 0 auto; }
+  .mode3-setup h3 { margin-bottom: 1.5rem; text-align: center; }
+  .input-group { margin-bottom: 1rem; }
+  .input-group label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; }
+  .input-group input { width: 100%; padding: 0.7rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 1rem; }
+  .input-group input:focus { outline: none; border-color: var(--tibia); }
+
+  /* ── MODE 4: ER MODE ── */
+  #mode4-body { max-width: 800px; margin: 0 auto; }
+  .er-intro { background: var(--surface); border: 1px solid var(--red); border-radius: 16px; padding: 2rem; margin-bottom: 2rem; display: flex; gap: 1.5rem; align-items: start; }
+  .er-intro-icon { font-size: 3rem; }
+  .er-progress { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .er-step { flex: 1; height: 6px; border-radius: 3px; background: var(--surface2); transition: background 0.3s; }
+  .er-step.done { background: var(--green); }
+  .er-step.active { background: var(--red); }
+  .er-case { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+  .er-xray-frame { background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center; }
+  .er-xray-frame img { width: 100%; height: 100%; object-fit: contain; }
+  .patient-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .patient-card h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px; color: var(--red); margin-bottom: 1rem; }
+  .patient-field { margin-bottom: 0.8rem; }
+  .patient-field .pf-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.2rem; }
+  .patient-field .pf-val { font-size: 0.9rem; }
+  .symptom-list { list-style: none; }
+  .symptom-list li { padding: 0.3rem 0; font-size: 0.85rem; color: var(--muted); }
+  .symptom-list li::before { content: "▸ "; color: var(--red); }
+  .diagnosis-section { margin-top: 1.5rem; }
+  .diagnosis-section h4 { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.8rem; }
+  .er-options { display: grid; grid-template-columns: 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+  .er-opt { padding: 0.8rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; font-size: 0.85rem; text-align: left; color: var(--text); transition: all 0.15s; }
+  .er-opt:hover { border-color: var(--red); }
+  .er-opt.correct { border-color: var(--green); background: rgba(63,185,80,0.15); color: var(--green); }
+  .er-opt.wrong { border-color: var(--red); background: rgba(248,81,73,0.15); color: var(--red); }
+  .er-feedback { background: var(--surface2); border-radius: 8px; padding: 1rem; margin-top: 0.8rem; font-size: 0.85rem; line-height: 1.6; display: none; }
+  .er-feedback.show { display: block; }
+  .er-score-bar { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; background: var(--surface); border-radius: 10px; padding: 0.8rem 1.2rem; }
+  .er-score-bar .er-score-num { font-size: 1.5rem; font-weight: 800; color: var(--red); }
+  .er-score-bar .er-score-label { font-size: 0.8rem; color: var(--muted); }
+  .er-next-btn { margin-top: 1rem; display: none; }
+  .er-next-btn.show { display: block; }
+  .er-complete { background: var(--surface); border: 2px solid var(--red); border-radius: 16px; padding: 3rem 2rem; text-align: center; display: none; }
+  .er-complete h2 { font-size: 2rem; color: var(--red); margin-bottom: 0.5rem; }
+  .er-complete .final-score { font-size: 4rem; font-weight: 900; margin: 1rem 0; }
+  .stars { font-size: 2.5rem; margin-bottom: 1rem; }
+
+  /* ── TOAST ── */
+  #toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 1.5rem; font-size: 0.9rem; z-index: 1000; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+
+  /* ── UTILS ── */
+  .text-center { text-align: center; }
+  .mt-1 { margin-top: 0.5rem; }
+  .mt-2 { margin-top: 1rem; }
+  .mt-3 { margin-top: 1.5rem; }
+  .hidden { display: none !important; }
+  @media (max-width: 600px) {
+    .mode-grid { grid-template-columns: 1fr; }
+    #mode1-body { grid-template-columns: 1fr; }
+    .assembly-area { grid-template-columns: 1fr; }
+    .er-case { grid-template-columns: 1fr; }
+    .q-options { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ═══ HOME ═══ -->
+<div id="screen-home" class="active">
+  <div class="logo">🦴</div>
+  <h1 class="home-title">OsteApp</h1>
+  <p class="home-sub">Aprende Tibia &amp; Peroné — 4 modos, 0 excusas</p>
+  <div class="progress-bar-wrap">
+    <div class="progress-label"><span>Progreso general</span><span id="progress-text">0 / 4 completados</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="mode-grid">
+    <div class="mode-card" onclick="startMode(1)" id="card-1">
+      <div class="mode-num">Modo 1</div>
+      <div class="mode-icon">🔬</div>
+      <div class="mode-name">Doctor X-Ray</div>
+      <div class="mode-desc">Explora el diagrama anatómico. Haz clic en cada zona para aprender sus partes y funciones.</div>
+    </div>
+    <div class="mode-card" onclick="startMode(2)" id="card-2">
+      <div class="mode-num">Modo 2</div>
+      <div class="mode-icon">🧩</div>
+      <div class="mode-name">Arma el Esqueleto</div>
+      <div class="mode-desc">Arrastra las etiquetas y colócalas en la parte correcta del hueso. ¿Sabes dónde va cada una?</div>
+    </div>
+    <div class="mode-card" onclick="startMode(3)" id="card-3">
+      <div class="mode-num">Modo 3</div>
+      <div class="mode-icon">⚔️</div>
+      <div class="mode-name">Bone vs Bone</div>
+      <div class="mode-desc">Trivia en dúo. Dos jugadores se turnan respondiendo preguntas. Gana quien sepa más.</div>
+    </div>
+    <div class="mode-card locked" onclick="checkER()" id="card-4">
+      <div class="mode-num">Modo 4 — Final</div>
+      <div class="mode-icon">🏥</div>
+      <div class="mode-name">ER Mode</div>
+      <div class="mode-desc">Eres médico de urgencias. Diagnostica fracturas reales con radiografías clínicas.</div>
+      <div class="lock-badge" id="lock-badge">🔒 Completa los 3 anteriores</div>
+    </div>
+  </div>
+  <div class="credits">
+    Imágenes: Gray's Anatomy (1918, dominio público) · Wikimedia Commons CC-BY-SA<br>
+    Datos: Wikipedia EN — Tibia, Fibula, Fracture types
+  </div>
+</div>
+
+<!-- ═══ MODE 1: DOCTOR X-RAY ═══ -->
+<div id="screen-1" class="screen">
+  <div class="screen-header">
+    <button class="btn-back" onclick="goHome()">← Inicio</button>
+    <div class="screen-title">🔬 Doctor X-Ray — Explora los huesos</div>
+    <div style="margin-left:auto; font-size:0.85rem; color:var(--muted);" id="m1-visited-count">0 / 21 partes vistas</div>
+  </div>
+  <div class="screen-body" style="max-width:1000px;">
+    <div id="mode1-body">
+      <div>
+        <div class="xray-view-btn" style="margin-bottom:0.8rem;">
+          <button class="view-btn active" onclick="switchView('anterior')" id="btn-ant">Vista Anterior</button>
+          <button class="view-btn" onclick="switchView('posterior')" id="btn-post">Vista Posterior</button>
+        </div>
+        <div class="xray-container" id="xray-container">
+          <img id="xray-img" src="https://upload.wikimedia.org/wikipedia/commons/4/45/Gray258.png" alt="Tibia y Peroné — Vista Anterior (Gray's Anatomy)">
+          <!-- Hotspots se añaden por JS -->
+        </div>
+        <p style="font-size:0.7rem;color:var(--muted);margin-top:0.4rem;text-align:center;">Henry Vandyke Carter — Gray's Anatomy (1918) · Dominio Público</p>
+      </div>
+      <div class="xray-panel">
+        <div class="xray-info-box" id="xray-info">
+          <p style="color:var(--muted); font-size:0.95rem; margin-top:2rem;">👆 Haz clic en cualquier punto del diagrama para ver información de esa parte anatómica.</p>
+        </div>
+        <div class="parts-list">
+          <h4>Partes anatómicas</h4>
+          <div id="parts-list-tibia">
+            <div style="font-size:0.75rem;color:var(--tibia);font-weight:700;margin-bottom:0.4rem;padding:0.3rem 0.5rem;">TIBIA</div>
+          </div>
+          <div id="parts-list-fibula" style="margin-top:0.5rem;">
+            <div style="font-size:0.75rem;color:var(--fibula);font-weight:700;margin-bottom:0.4rem;padding:0.3rem 0.5rem;">PERONÉ</div>
+          </div>
+          <div class="part-count" id="part-count-display">Clic en una parte para empezar</div>
+        </div>
+        <button class="btn btn-primary" id="m1-complete-btn" onclick="completeMode(1)" style="display:none;">Completar modo ✓</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODE 2: ARMA EL ESQUELETO ═══ -->
+<div id="screen-2" class="screen">
+  <div class="screen-header">
+    <button class="btn-back" onclick="goHome()">← Inicio</button>
+    <div class="screen-title">🧩 Arma el Esqueleto</div>
+    <div style="margin-left:auto; font-size:0.9rem;" id="m2-score-display">⭐ 0 / 10 correctas</div>
+  </div>
+  <div class="screen-body" style="max-width:900px;">
+    <p class="assembly-instructions">Arrastra cada etiqueta al punto numerado que le corresponde en el hueso. Las azules son de tibia, las naranjas de peroné.</p>
+    <div class="assembly-area">
+      <div class="label-pool" id="label-pool-left">
+        <h4>Etiquetas</h4>
+      </div>
+      <div class="bone-diagram" id="bone-diagram-wrap">
+        <img id="assembly-img" src="https://upload.wikimedia.org/wikipedia/commons/4/45/Gray258.png" alt="Diagrama anatómico">
+      </div>
+      <div class="label-pool" id="label-pool-right">
+        <h4>También disponibles</h4>
+      </div>
+    </div>
+    <div class="assembly-complete" id="assembly-complete">
+      <h2>🎉 ¡Esqueleto armado!</h2>
+      <p style="color:var(--muted);margin-bottom:1rem;">Has colocado todas las etiquetas correctamente.</p>
+      <button class="btn btn-primary" onclick="completeMode(2);goHome();">Continuar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODE 3: BONE VS BONE ═══ -->
+<div id="screen-3" class="screen">
+  <div class="screen-header">
+    <button class="btn-back" onclick="goHome()">← Inicio</button>
+    <div class="screen-title">⚔️ Bone vs Bone — Trivia</div>
+  </div>
+  <div class="screen-body">
+    <div id="mode3-body">
+      <!-- Setup -->
+      <div id="m3-setup">
+        <div class="mode3-setup">
+          <h3>¿Quién juega?</h3>
+          <div class="input-group">
+            <label>Jugador 1 (Tibia)</label>
+            <input type="text" id="p1-name" value="Jugador 1" placeholder="Nombre del jugador 1">
+          </div>
+          <div class="input-group">
+            <label>Jugador 2 (Peroné)</label>
+            <input type="text" id="p2-name" value="Jugador 2" placeholder="Nombre del jugador 2">
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:0.5rem;" onclick="startTrivia()">¡Empezar duelo! ⚔️</button>
+        </div>
+      </div>
+      <!-- Game -->
+      <div id="m3-game" class="hidden">
+        <div class="players-header">
+          <div class="player-card" id="p1-card">
+            <div class="player-name" id="p1-display">Jugador 1</div>
+            <div class="player-score" id="p1-score">0</div>
+          </div>
+          <div class="vs-badge">VS</div>
+          <div class="player-card" id="p2-card">
+            <div class="player-name" id="p2-display">Jugador 2</div>
+            <div class="player-score" id="p2-score">0</div>
+          </div>
+        </div>
+        <div class="turn-indicator">Turno de: <strong id="current-turn-name">—</strong></div>
+        <div class="q-counter" id="q-counter">Pregunta 1 de 16</div>
+        <div class="question-card">
+          <div class="q-category" id="q-cat">Anatomía</div>
+          <div class="q-text" id="q-text">Pregunta...</div>
+          <div class="q-options" id="q-opts"></div>
+        </div>
+      </div>
+      <!-- Result -->
+      <div id="m3-result" class="hidden">
+        <div class="result-overlay">
+          <div style="font-size:3rem;" id="result-emoji">🏆</div>
+          <h2 id="result-title">¡Partida terminada!</h2>
+          <p style="color:var(--muted);" id="result-sub">Resultado final</p>
+          <div class="result-scores">
+            <div class="result-score-item">
+              <div class="rs-name" id="r-p1-name">J1</div>
+              <div class="rs-num" id="r-p1-score">0</div>
+            </div>
+            <div class="result-score-item">
+              <div class="rs-name" id="r-p2-name">J2</div>
+              <div class="rs-num" id="r-p2-score">0</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:1rem;justify-content:center;margin-top:1rem;">
+            <button class="btn btn-secondary" onclick="resetTrivia()">Jugar de nuevo</button>
+            <button class="btn btn-primary" onclick="completeMode(3);goHome();">Siguiente modo →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODE 4: ER MODE ═══ -->
+<div id="screen-4" class="screen">
+  <div class="screen-header">
+    <button class="btn-back" onclick="goHome()">← Inicio</button>
+    <div class="screen-title">🏥 ER Mode — Diagnóstico de Urgencias</div>
+    <div style="margin-left:auto; font-size:0.85rem; color:var(--red); font-weight:700;" id="er-score-display">Score: 0</div>
+  </div>
+  <div class="screen-body">
+    <div id="mode4-body">
+      <div class="er-intro">
+        <div class="er-intro-icon">🩺</div>
+        <div>
+          <h3 style="margin-bottom:0.4rem;">Bienvenido al Servicio de Urgencias</h3>
+          <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;">Son las 3 AM. Tienes 5 casos esperando. Examina la radiografía, lee los síntomas y diagnostica el tipo de fractura. El equipo de ortopedia espera tu evaluación.</p>
+          <button class="btn btn-danger" style="margin-top:1rem;" onclick="startER()">Iniciar turno →</button>
+        </div>
+      </div>
+      <div id="er-game" class="hidden">
+        <div class="er-progress" id="er-progress-bar"></div>
+        <div class="er-score-bar">
+          <div>
+            <div class="er-score-num" id="er-score-num">0</div>
+            <div class="er-score-label">puntos</div>
+          </div>
+          <div style="flex:1;margin-left:0.5rem;">
+            <div style="font-size:0.8rem;color:var(--muted);">Caso <span id="er-case-num">1</span> de 5</div>
+          </div>
+        </div>
+        <div class="er-case" id="er-case-area">
+          <div class="er-xray-frame">
+            <img id="er-xray" src="" alt="Radiografía clínica">
+          </div>
+          <div>
+            <div class="patient-card">
+              <h3>📋 Ficha del paciente</h3>
+              <div class="patient-field">
+                <div class="pf-label">Paciente</div>
+                <div class="pf-val" id="er-patient-name">—</div>
+              </div>
+              <div class="patient-field">
+                <div class="pf-label">Mecanismo de lesión</div>
+                <div class="pf-val" id="er-mechanism">—</div>
+              </div>
+              <div class="patient-field">
+                <div class="pf-label">Síntomas</div>
+                <ul class="symptom-list" id="er-symptoms"></ul>
+              </div>
+            </div>
+            <div class="diagnosis-section">
+              <h4>Tu diagnóstico:</h4>
+              <div class="er-options" id="er-options"></div>
+              <div class="er-feedback" id="er-feedback"></div>
+              <button class="btn btn-primary er-next-btn" id="er-next-btn" onclick="nextERCase()">Siguiente caso →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="er-complete" id="er-complete">
+        <div style="font-size:3rem;">🏥</div>
+        <h2>Turno terminado, Doctor</h2>
+        <div class="stars" id="er-stars">⭐⭐⭐</div>
+        <div class="final-score" id="er-final-score">0</div>
+        <p style="color:var(--muted);margin-bottom:1.5rem;">puntos de 500 posibles</p>
+        <p id="er-verdict" style="margin-bottom:1.5rem;color:var(--muted);"></p>
+        <button class="btn btn-primary" onclick="completeMode(4);goHome();">Ver resultados finales →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════
+//  STATE
+// ══════════════════════════════
+function loadSaved() {
+  try { return JSON.parse(localStorage.getItem('osteapp_completed') || '[]'); } catch(e) { return []; }
+}
+function saveState() {
+  try { localStorage.setItem('osteapp_completed', JSON.stringify(state.completed)); } catch(e) {}
+}
+const state = {
+  completed: loadSaved(),
+  m1Visited: new Set(),
+};
+
+// ══════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════
+function goHome() {
+  document.querySelectorAll('.screen,.active').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-home').classList.add('active');
+  updateHomeUI();
+}
+function showScreen(id) {
+  document.querySelectorAll('#screen-home,.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+function startMode(n) {
+  if (n === 4 && !canPlayER()) { toast('Completa los modos 1, 2 y 3 primero 🔒'); return; }
+  showScreen(n);
+  if (n === 1) initMode1();
+  if (n === 2) initMode2();
+  if (n === 3) initMode3();
+  if (n === 4) initMode4();
+}
+function checkER() {
+  if (canPlayER()) startMode(4);
+  else toast('Completa los modos 1, 2 y 3 primero 🔒');
+}
+function canPlayER() {
+  return [1,2,3].every(n => state.completed.includes(n));
+}
+function completeMode(n) {
+  if (!state.completed.includes(n)) {
+    state.completed.push(n);
+    saveState();
+    toast(`¡Modo ${n} completado! ✓`);
+  }
+  updateHomeUI();
+}
+function updateHomeUI() {
+  const done = state.completed.length;
+  document.getElementById('progress-text').textContent = `${done} / 4 completados`;
+  document.getElementById('progress-fill').style.width = (done / 4 * 100) + '%';
+  [1,2,3,4].forEach(n => {
+    const card = document.getElementById('card-' + n);
+    const badge = card.querySelector('.complete-badge, .lock-badge');
+    if (state.completed.includes(n)) {
+      if (badge) badge.remove();
+      const b = document.createElement('div');
+      b.className = 'complete-badge'; b.textContent = '✓ Completo';
+      card.appendChild(b);
+    }
+  });
+  if (canPlayER()) {
+    const card4 = document.getElementById('card-4');
+    card4.classList.remove('locked');
+    const lb = document.getElementById('lock-badge');
+    if (lb) lb.remove();
+  }
+}
+
+// ══════════════════════════════
+//  TOAST
+// ══════════════════════════════
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ══════════════════════════════
+//  MODE 1: DOCTOR X-RAY
+// ══════════════════════════════
+const partsData = {
+  tibia: [
+    { id: 't1', name: 'Epífisis proximal', en: 'Proximal epiphysis', desc: 'Extremo superior expandido que se articula con el fémur. Conforma la parte tibial de la rodilla.', fun: 'Transmite el peso del fémur a la diáfisis tibial.' },
+    { id: 't2', name: 'Platillo tibial', en: 'Tibial plateau', desc: 'Superficie articular superior. Sobre ella descansan los cóndilos femorales y los meniscos.', fun: 'Soporte de cargas del fémur. Sin meniscos, sufriría el doble de presión.' },
+    { id: 't3', name: 'Eminencia intercondílea', en: 'Intercondylar eminence', desc: 'Prominencia entre los cóndilos. Divide en tubérculo medial y lateral (espinas tibiales).', fun: 'Inserción de los ligamentos cruzados anterior y posterior.' },
+    { id: 't4', name: 'Tuberosidad tibial', en: 'Tibial tuberosity', desc: 'Prominencia anterior justo debajo de los cóndilos. Palpable bajo la rótula.', fun: 'Inserción del ligamento rotuliano. Transmite la fuerza del cuádriceps.', nota: 'La enfermedad de Osgood-Schlatter afecta esta zona en adolescentes activos.' },
+    { id: 't5', name: 'Diáfisis', en: 'Diaphysis (shaft)', desc: 'Cuerpo largo de la tibia. Sección triangular con cresta anterior (espinilla) completamente subcutánea.', fun: 'Soporte estructural principal. Contiene médula ósea. Soporta hasta 4.7× el peso corporal.' },
+    { id: 't6', name: 'Cóndilo medial', en: 'Medial condyle', desc: 'La mayor de las dos superficies articulares planas de la epífisis proximal.', fun: 'Se articula con el cóndilo medial del fémur.' },
+    { id: 't7', name: 'Cóndilo lateral', en: 'Lateral condyle', desc: 'El menor de los cóndilos tibiales. Tiene una faceta para la cabeza del peroné.', fun: 'Articula con el cóndilo lateral del fémur y con la cabeza del peroné.' },
+    { id: 't8', name: 'Cresta interósea', en: 'Interosseous crest', desc: 'Borde afilado en la cara lateral de la diáfisis tibial.', fun: 'Punto de unión de la membrana interósea que conecta tibia y peroné.' },
+    { id: 't9', name: 'Maléolo medial', en: 'Medial malleolus', desc: 'Proceso piramidal en el extremo distal medial. La "bolita" interna del tobillo.', fun: 'Límite medial de la mortaja del tobillo. Inserción del ligamento deltoides.', nota: 'Frecuentemente fracturado en la fractura de Pott (bimaleolar).' },
+    { id: 't10', name: 'Epífisis distal', en: 'Distal epiphysis', desc: 'Extremo inferior de la tibia. Articular en su cara inferior con el astrágalo.', fun: 'Transmite el peso corporal al pie. Forma la mortaja tibial del tobillo.' },
+    { id: 't11', name: 'Línea del sóleo', en: 'Soleal line', desc: 'Cresta diagonal en la cara posterior de la diáfisis proximal.', fun: 'Origen del músculo sóleo. Límite inferior de la inserción del poplíteo.' },
+    { id: 't12', name: 'Escotadura fibular', en: 'Fibular notch', desc: 'Concavidad lateral en la epífisis distal de la tibia.', fun: 'Articula con el peroné distal formando la sindesmosis tibiofibular.' },
+    { id: 't13', name: 'Tubérculo de Gerdy', en: "Gerdy's tubercle", desc: 'Eminencia en la cara anterolateral de la diáfisis proximal.', fun: 'Inserción de la cintilla iliotibial (banda IT), estabilizador lateral de rodilla.' },
+  ],
+  fibula: [
+    { id: 'f1', name: 'Cabeza del peroné', en: 'Head of fibula', desc: 'Extremo superior del peroné, de forma cuadrada e irregular. Tiene una faceta articular oval en su cara medial.', fun: 'Se articula con el cóndilo lateral de la tibia (articulación tibiofibular proximal).' },
+    { id: 'f2', name: 'Ápex (proceso estiloide)', en: 'Apex / Styloid process', desc: 'Proyección puntiaguda hacia arriba desde la región posterior de la cabeza.', fun: 'Inserción del bíceps femoral (cabeza corta) y el ligamento colateral lateral de rodilla.' },
+    { id: 'f3', name: 'Cuello del peroné', en: 'Neck of fibula', desc: 'Zona estrecha entre la cabeza y la diáfisis.', fun: 'El nervio peroneo común rodea esta zona — su lesión causa pie caído (foot drop).', nota: 'Es el nervio periférico más frecuentemente lesionado del cuerpo.' },
+    { id: 'f4', name: 'Diáfisis del peroné', en: 'Fibular shaft', desc: 'Cuerpo largo y delgado con cuatro bordes y cuatro superficies. El más delgado en relación a su longitud.', fun: 'Inserción de ~9 músculos. La cresta interósea une la membrana interósea.' },
+    { id: 'f5', name: 'Maléolo lateral', en: 'Lateral malleolus', desc: 'Extremo distal del peroné. Se extiende ~1 cm más abajo que el maléolo medial tibial.', fun: 'Límite lateral de la mortaja del tobillo. Inserción de ligamentos colaterales laterales.', nota: 'Fractura más frecuente en esguinces graves de tobillo.' },
+    { id: 'f6', name: 'Fosa maleolar', en: 'Malleolar fossa', desc: 'Depresión en la cara posterior del maléolo lateral.', fun: 'Inserción del ligamento peroneoastragalino posterior y del ligamento peroneocalcáneo.' },
+    { id: 'f7', name: 'Cresta interósea del peroné', en: 'Fibular interosseous crest', desc: 'Borde medial afilado de la diáfisis peronea.', fun: 'Unión con la membrana interósea que conecta el peroné con la tibia en toda su longitud.' },
+    { id: 'f8', name: 'Faceta articular maleolar', en: 'Articular facet of malleolus', desc: 'Superficie cartilaginosa en la cara medial del maléolo lateral.', fun: 'Se articula con la cara lateral del astrágalo formando parte del tobillo.' },
+  ]
+};
+
+// Hotspot positions [x%, y%] for anterior view image (Gray258)
+const hotspotPositions = {
+  anterior: [
+    { id: 't1', x: 28, y: 5, bone: 'tibia' },
+    { id: 't6', x: 22, y: 8, bone: 'tibia' },
+    { id: 't7', x: 34, y: 8, bone: 'tibia' },
+    { id: 't2', x: 28, y: 12, bone: 'tibia' },
+    { id: 't3', x: 28, y: 18, bone: 'tibia' },
+    { id: 't4', x: 22, y: 22, bone: 'tibia' },
+    { id: 't13', x: 32, y: 22, bone: 'tibia' },
+    { id: 't5', x: 25, y: 50, bone: 'tibia' },
+    { id: 't8', x: 32, y: 55, bone: 'tibia' },
+    { id: 't10', x: 25, y: 88, bone: 'tibia' },
+    { id: 't9', x: 20, y: 93, bone: 'tibia' },
+    { id: 't12', x: 32, y: 90, bone: 'tibia' },
+    { id: 'f1', x: 60, y: 8, bone: 'fibula' },
+    { id: 'f2', x: 65, y: 5, bone: 'fibula' },
+    { id: 'f3', x: 60, y: 14, bone: 'fibula' },
+    { id: 'f7', x: 63, y: 40, bone: 'fibula' },
+    { id: 'f4', x: 66, y: 55, bone: 'fibula' },
+    { id: 'f5', x: 68, y: 88, bone: 'fibula' },
+    { id: 'f6', x: 72, y: 92, bone: 'fibula' },
+    { id: 'f8', x: 62, y: 93, bone: 'fibula' },
+    { id: 't11', x: 25, y: 28, bone: 'tibia' },
+  ]
+};
+
+let m1CurrentView = 'anterior';
+
+function initMode1() {
+  renderPartsList();
+  renderHotspots();
+  updateM1Counter();
+}
+
+function renderPartsList() {
+  const tibiaList = document.getElementById('parts-list-tibia');
+  const fibulaList = document.getElementById('parts-list-fibula');
+  // Clear existing items except header
+  while (tibiaList.children.length > 1) tibiaList.removeChild(tibiaList.lastChild);
+  while (fibulaList.children.length > 1) fibulaList.removeChild(fibulaList.lastChild);
+  partsData.tibia.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'part-item' + (state.m1Visited.has(p.id) ? ' visited' : '');
+    el.id = 'list-' + p.id;
+    el.innerHTML = `<div class="part-dot" style="background:var(--tibia)"></div>${p.name}`;
+    el.onclick = () => showPartInfo(p, 'tibia');
+    tibiaList.appendChild(el);
+  });
+  partsData.fibula.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'part-item' + (state.m1Visited.has(p.id) ? ' visited' : '');
+    el.id = 'list-' + p.id;
+    el.innerHTML = `<div class="part-dot" style="background:var(--fibula)"></div>${p.name}`;
+    el.onclick = () => showPartInfo(p, 'fibula');
+    fibulaList.appendChild(el);
+  });
+}
+
+function renderHotspots() {
+  const container = document.getElementById('xray-container');
+  container.querySelectorAll('.hotspot').forEach(h => h.remove());
+  const positions = hotspotPositions[m1CurrentView] || hotspotPositions.anterior;
+  positions.forEach((pos, i) => {
+    const allParts = [...partsData.tibia, ...partsData.fibula];
+    const part = allParts.find(p => p.id === pos.id);
+    if (!part) return;
+    const hs = document.createElement('div');
+    hs.className = `hotspot ${pos.bone === 'tibia' ? 'tibia-hs' : 'fibula-hs'}`;
+    hs.style.left = pos.x + '%';
+    hs.style.top = pos.y + '%';
+    hs.style.transform = 'translate(-50%, -50%)';
+    hs.textContent = i + 1;
+    hs.title = part.name;
+    hs.onclick = () => showPartInfo(part, pos.bone);
+    container.appendChild(hs);
+  });
+}
+
+function showPartInfo(part, bone) {
+  state.m1Visited.add(part.id);
+  const color = bone === 'tibia' ? 'var(--tibia)' : 'var(--fibula)';
+  const tagClass = bone === 'tibia' ? 'tag-tibia' : 'tag-fibula';
+  const nota = part.nota ? `<div class="fact">⚕️ Nota clínica: ${part.nota}</div>` : '';
+  document.getElementById('xray-info').innerHTML = `
+    <h3>${part.name}</h3>
+    <span class="tag ${tagClass}">${bone === 'tibia' ? 'TIBIA' : 'PERONÉ'}</span>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.8rem;font-style:italic;">${part.en}</p>
+    <p>${part.desc}</p>
+    <div class="fact" style="border-left-color:${color};margin-top:0.8rem;">🔧 <strong>Función:</strong> ${part.fun}</div>
+    ${nota}
+  `;
+  // Mark in list
+  const listEl = document.getElementById('list-' + part.id);
+  if (listEl) listEl.classList.add('visited');
+  // Active hotspot
+  document.querySelectorAll('.hotspot').forEach(h => h.classList.remove('active'));
+  updateM1Counter();
+  // Show complete button if enough visited
+  if (state.m1Visited.size >= 10) {
+    document.getElementById('m1-complete-btn').style.display = 'block';
+  }
+}
+
+function updateM1Counter() {
+  const total = partsData.tibia.length + partsData.fibula.length;
+  document.getElementById('m1-visited-count').textContent = `${state.m1Visited.size} / ${total} partes vistas`;
+  document.getElementById('part-count-display').textContent = `${state.m1Visited.size} de ${total} exploradas`;
+}
+
+function switchView(view) {
+  m1CurrentView = view;
+  document.getElementById('xray-img').src = view === 'anterior'
+    ? 'https://upload.wikimedia.org/wikipedia/commons/4/45/Gray258.png'
+    : 'https://upload.wikimedia.org/wikipedia/commons/2/24/Gray259.png';
+  document.getElementById('btn-ant').className = 'view-btn' + (view === 'anterior' ? ' active' : '');
+  document.getElementById('btn-post').className = 'view-btn' + (view === 'posterior' ? ' active' : '');
+  renderHotspots();
+}
+
+// ══════════════════════════════
+//  MODE 2: ASSEMBLY
+// ══════════════════════════════
+const assemblyItems = [
+  { id: 'a1', label: 'Platillo tibial', bone: 'tibia', pos: { x: 26, y: 12 } },
+  { id: 'a2', label: 'Tuberosidad tibial', bone: 'tibia', pos: { x: 20, y: 22 } },
+  { id: 'a3', label: 'Diáfisis tibial', bone: 'tibia', pos: { x: 23, y: 50 } },
+  { id: 'a4', label: 'Maléolo medial', bone: 'tibia', pos: { x: 19, y: 93 } },
+  { id: 'a5', label: 'Epífisis proximal', bone: 'tibia', pos: { x: 27, y: 5 } },
+  { id: 'a6', label: 'Cabeza del peroné', bone: 'fibula', pos: { x: 59, y: 8 } },
+  { id: 'a7', label: 'Cuello del peroné', bone: 'fibula', pos: { x: 59, y: 14 } },
+  { id: 'a8', label: 'Diáfisis peronea', bone: 'fibula', pos: { x: 65, y: 55 } },
+  { id: 'a9', label: 'Maléolo lateral', bone: 'fibula', pos: { x: 67, y: 88 } },
+  { id: 'a10', label: 'Eminencia intercondílea', bone: 'tibia', pos: { x: 27, y: 18 } },
+];
+let m2Score = 0;
+let m2DragItem = null;
+
+function initMode2() {
+  m2Score = 0;
+  document.getElementById('m2-score-display').textContent = '⭐ 0 / 10 correctas';
+  document.getElementById('assembly-complete').style.display = 'none';
+  const poolLeft = document.getElementById('label-pool-left');
+  const poolRight = document.getElementById('label-pool-right');
+  // Clear
+  while (poolLeft.children.length > 1) poolLeft.removeChild(poolLeft.lastChild);
+  while (poolRight.children.length > 1) poolRight.removeChild(poolRight.lastChild);
+  // Remove old dropzones
+  document.querySelectorAll('.drop-zone').forEach(d => d.remove());
+  // Shuffle
+  const shuffled = [...assemblyItems].sort(() => Math.random() - 0.5);
+  shuffled.forEach((item, i) => {
+    const label = document.createElement('div');
+    label.className = 'drag-label';
+    label.draggable = true;
+    label.dataset.id = item.id;
+    label.textContent = item.label;
+    label.style.borderColor = item.bone === 'tibia' ? 'rgba(74,158,255,0.4)' : 'rgba(255,107,74,0.4)';
+    label.style.color = item.bone === 'tibia' ? 'var(--tibia)' : 'var(--fibula)';
+    label.addEventListener('dragstart', e => {
+      m2DragItem = item.id;
+      label.classList.add('dragging');
+    });
+    label.addEventListener('dragend', () => label.classList.remove('dragging'));
+    if (i < 5) poolLeft.appendChild(label);
+    else poolRight.appendChild(label);
+  });
+  // Drop zones
+  const wrap = document.getElementById('bone-diagram-wrap');
+  assemblyItems.forEach((item, i) => {
+    const dz = document.createElement('div');
+    dz.className = 'drop-zone';
+    dz.dataset.target = item.id;
+    dz.textContent = i + 1;
+    dz.style.left = item.pos.x + '%';
+    dz.style.top = item.pos.y + '%';
+    dz.style.transform = 'translate(-50%, -50%)';
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+    dz.addEventListener('drop', e => {
+      e.preventDefault();
+      dz.classList.remove('drag-over');
+      handleDrop(item.id, dz);
+    });
+    wrap.appendChild(dz);
+  });
+}
+
+function handleDrop(targetId, dz) {
+  if (dz.classList.contains('correct')) return;
+  if (m2DragItem === targetId) {
+    dz.classList.add('correct');
+    const item = assemblyItems.find(a => a.id === targetId);
+    dz.textContent = '';
+    dz.style.fontSize = '0.5rem';
+    dz.innerHTML = `<span style="text-align:center;padding:2px;">${item.label}</span>`;
+    // Remove from pool
+    document.querySelector(`[data-id="${targetId}"]`)?.remove();
+    m2Score++;
+    document.getElementById('m2-score-display').textContent = `⭐ ${m2Score} / 10 correctas`;
+    if (m2Score === 10) document.getElementById('assembly-complete').style.display = 'block';
+    toast('¡Correcto! ✓');
+  } else {
+    dz.classList.add('wrong');
+    setTimeout(() => dz.classList.remove('wrong'), 500);
+    toast('Incorrecto, intenta de nuevo');
+  }
+}
+
+// ══════════════════════════════
+//  MODE 3: TRIVIA
+// ══════════════════════════════
+const triviaQuestions = [
+  { cat: 'Anatomía', q: '¿Cuál es el segundo hueso más largo del cuerpo humano?', opts: ['Tibia', 'Fémur', 'Peroné', 'Húmero'], ans: 0 },
+  { cat: 'Función', q: '¿Qué porcentaje del peso corporal soporta el peroné?', opts: ['Menos del 10%', 'Alrededor del 30%', 'Más del 50%', 'El mismo que la tibia'], ans: 0 },
+  { cat: 'Etimología', q: '¿De qué objeto se deriva el nombre latino "fíbula" (peroné)?', opts: ['Un imperdible/broche', 'Una flecha', 'Una flauta', 'Una hebilla de cinturón'], ans: 0 },
+  { cat: 'Etimología', q: '¿Qué significa la palabra latina "tibia"?', opts: ['Flauta', 'Palanca', 'Espinilla', 'Rodilla'], ans: 0 },
+  { cat: 'Anatomía', q: '¿Qué estructura conecta la tibia y el peroné a lo largo de toda su longitud?', opts: ['Membrana interósea', 'Ligamento cruzado', 'Menisco', 'Cápsula articular'], ans: 0 },
+  { cat: 'Fracturas', q: '¿Qué tipo de fractura involucra 3 o más fragmentos óseos?', opts: ['Conminuta', 'Transversal', 'En espiral', 'De estrés'], ans: 0 },
+  { cat: 'Fracturas', q: 'La fractura de Pott clásica involucra a ambos maléolos. ¿Cuál es el mecanismo?', opts: ['Eversión forzada del tobillo', 'Torsión de la tibia', 'Impacto directo frontal', 'Caída de altura'], ans: 0 },
+  { cat: 'Clínica', q: '¿Qué nervio puede lesionarse en una fractura del cuello del peroné?', opts: ['Nervio peroneo común', 'Nervio tibial', 'Nervio safeno', 'Nervio sural'], ans: 0 },
+  { cat: 'Clínica', q: '¿Qué condición causa una lesión del nervio peroneo común?', opts: ['Pie caído (foot drop)', 'Pie plano', 'Pie cavo', 'Fascitis plantar'], ans: 0 },
+  { cat: 'Anatomía', q: '¿Cuál es la "bolita" palpable en el lado interno del tobillo?', opts: ['Maléolo medial', 'Maléolo lateral', 'Cabeza del peroné', 'Astrágalo'], ans: 0 },
+  { cat: 'Anatomía', q: '¿Dónde se inserta el ligamento rotuliano (tendón del cuádriceps)?', opts: ['Tuberosidad tibial', 'Platillo tibial', 'Maléolo medial', 'Cóndilo lateral'], ans: 0 },
+  { cat: 'Curiosidades', q: '¿Cuántas veces el peso corporal puede soportar la tibia durante la marcha?', opts: ['4.7 veces', '1.5 veces', '2 veces', '10 veces'], ans: 0 },
+  { cat: 'Fracturas', q: '¿Qué tipo de fractura es causada por carga repetitiva sin traumatismo único?', opts: ['Fractura de estrés', 'Fractura transversal', 'Fractura de Pott', 'Fractura conminuta'], ans: 0 },
+  { cat: 'Clínica', q: 'El peroné puede donarse en cirugía reconstructiva. ¿Cuántos cm pueden extraerse?', opts: ['Hasta 25 cm', 'Hasta 5 cm', 'Hasta 10 cm', 'No puede donarse'], ans: 0 },
+  { cat: 'Anatomía', q: '¿Qué articulación forma la cabeza del peroné con la tibia?', opts: ['Articulación tibiofibular proximal (artrodia)', 'Sindesmosis', 'Articulación del tobillo', 'Rodilla'], ans: 0 },
+  { cat: 'Anatomía', q: '¿Cuál es la articulación fibrosa entre tibia y peroné en el extremo distal?', opts: ['Sindesmosis tibiofibular', 'Artrodia', 'Sínfisis', 'Sutura'], ans: 0 },
+];
+
+// Randomize wrong options per question
+const shuffledTrivia = triviaQuestions.map(q => {
+  const correct = q.opts[q.ans];
+  const wrongs = q.opts.filter((_, i) => i !== q.ans).sort(() => Math.random() - 0.5);
+  const newOpts = [correct, ...wrongs].sort(() => Math.random() - 0.5);
+  return { ...q, opts: newOpts, ans: newOpts.indexOf(correct) };
+});
+
+let triviaState = { current: 0, p1Score: 0, p2Score: 0, answered: false };
+
+function initMode3() {
+  // Nothing until setup submit
+}
+
+function startTrivia() {
+  triviaState = { current: 0, p1Score: 0, p2Score: 0, answered: false };
+  document.getElementById('p1-display').textContent = document.getElementById('p1-name').value || 'Jugador 1';
+  document.getElementById('p2-display').textContent = document.getElementById('p2-name').value || 'Jugador 2';
+  document.getElementById('r-p1-name').textContent = document.getElementById('p1-name').value || 'Jugador 1';
+  document.getElementById('r-p2-name').textContent = document.getElementById('p2-name').value || 'Jugador 2';
+  document.getElementById('m3-setup').classList.add('hidden');
+  document.getElementById('m3-result').classList.add('hidden');
+  document.getElementById('m3-game').classList.remove('hidden');
+  renderTrivia();
+}
+
+function renderTrivia() {
+  const q = shuffledTrivia[triviaState.current];
+  const turn = triviaState.current % 2 === 0 ? 1 : 2;
+  const p1Name = document.getElementById('p1-name').value || 'Jugador 1';
+  const p2Name = document.getElementById('p2-name').value || 'Jugador 2';
+  document.getElementById('current-turn-name').textContent = turn === 1 ? p1Name : p2Name;
+  document.getElementById('p1-card').classList.toggle('active', turn === 1);
+  document.getElementById('p2-card').classList.toggle('active', turn === 2);
+  document.getElementById('p1-score').textContent = triviaState.p1Score;
+  document.getElementById('p2-score').textContent = triviaState.p2Score;
+  document.getElementById('q-counter').textContent = `Pregunta ${triviaState.current + 1} de ${shuffledTrivia.length}`;
+  document.getElementById('q-cat').textContent = q.cat;
+  document.getElementById('q-text').textContent = q.q;
+  const optsEl = document.getElementById('q-opts');
+  optsEl.innerHTML = '';
+  q.opts.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'q-opt';
+    btn.textContent = opt;
+    btn.onclick = () => answerTrivia(i, turn);
+    optsEl.appendChild(btn);
+  });
+  triviaState.answered = false;
+}
+
+function answerTrivia(i, turn) {
+  if (triviaState.answered) return;
+  triviaState.answered = true;
+  const q = shuffledTrivia[triviaState.current];
+  const btns = document.querySelectorAll('.q-opt');
+  btns.forEach((btn, j) => {
+    btn.disabled = true;
+    if (j === q.ans) btn.classList.add('correct');
+    if (j === i && i !== q.ans) btn.classList.add('wrong');
+  });
+  if (i === q.ans) {
+    if (turn === 1) triviaState.p1Score++;
+    else triviaState.p2Score++;
+    document.getElementById(turn === 1 ? 'p1-score' : 'p2-score').textContent =
+      turn === 1 ? triviaState.p1Score : triviaState.p2Score;
+    toast('¡Correcto! +1 punto ✓');
+  } else {
+    toast('Incorrecto ✗');
+  }
+  setTimeout(() => {
+    triviaState.current++;
+    if (triviaState.current >= shuffledTrivia.length) endTrivia();
+    else renderTrivia();
+  }, 1200);
+}
+
+function endTrivia() {
+  document.getElementById('m3-game').classList.add('hidden');
+  document.getElementById('m3-result').classList.remove('hidden');
+  const p1 = triviaState.p1Score, p2 = triviaState.p2Score;
+  const p1Name = document.getElementById('p1-name').value || 'Jugador 1';
+  const p2Name = document.getElementById('p2-name').value || 'Jugador 2';
+  document.getElementById('r-p1-score').textContent = p1;
+  document.getElementById('r-p2-score').textContent = p2;
+  if (p1 > p2) {
+    document.getElementById('result-emoji').textContent = '🏆';
+    document.getElementById('result-title').textContent = `¡Gana ${p1Name}!`;
+    document.getElementById('r-p1-score').classList.add('winner-highlight');
+  } else if (p2 > p1) {
+    document.getElementById('result-emoji').textContent = '🏆';
+    document.getElementById('result-title').textContent = `¡Gana ${p2Name}!`;
+    document.getElementById('r-p2-score').classList.add('winner-highlight');
+  } else {
+    document.getElementById('result-emoji').textContent = '🤝';
+    document.getElementById('result-title').textContent = '¡Empate!';
+  }
+}
+
+function resetTrivia() {
+  document.getElementById('m3-result').classList.add('hidden');
+  document.getElementById('m3-game').classList.add('hidden');
+  document.getElementById('m3-setup').classList.remove('hidden');
+}
+
+// ══════════════════════════════
+//  MODE 4: ER MODE
+// ══════════════════════════════
+const erCases = [
+  {
+    patient: 'Marcos R., 34 años, futbolista',
+    mechanism: 'Recibió un golpe lateral en el tobillo durante un partido',
+    symptoms: ['Dolor intenso inmediato en tobillo', 'Hinchazón rápida bilateral', 'Incapacidad para soportar peso', 'Deformidad visible del tobillo', 'Crepitación al movilizar'],
+    xray: 'https://upload.wikimedia.org/wikipedia/commons/6/63/Fractured_Fibula.jpg',
+    xrayCaption: 'Radiografía AP de tobillo derecho · Wikimedia Commons CC-BY-SA 4.0',
+    correct: 'Fractura de Pott (bimaleolar)',
+    options: ['Fractura de Pott (bimaleolar)', 'Fractura de estrés del peroné', 'Esguince de tobillo', 'Fractura conminuta de tibia'],
+    feedback: 'Correcto. La fractura de Pott clásica involucra el maléolo lateral (peroné) y el maléolo medial (tibia). Se produce por eversión forzada del tobillo — el tobillo gira hacia afuera. Descrita por Percivall Pott en 1769, quien la sufrió personalmente en 1765.'
+  },
+  {
+    patient: 'Laura M., 28 años, corredora de maratón',
+    mechanism: 'Dolor progresivo en tibia anterior durante los últimos 3 meses de entrenamiento intenso',
+    symptoms: ['Dolor que aparece al correr y mejora con reposo', 'Dolor puntual a la palpación en tibia anterior', 'Leve inflamación local', 'Sin deformidad visible', 'Radiografía inicial negativa'],
+    xray: 'https://upload.wikimedia.org/wikipedia/commons/8/8b/Gray257.png',
+    xrayCaption: 'Superficie superior de tibia — Gray\'s Anatomy 1918 · Dominio Público',
+    correct: 'Fractura de estrés tibial',
+    options: ['Fractura de estrés tibial', 'Fractura transversal de tibia', 'Síndrome de compartimento', 'Fractura de Pott'],
+    feedback: 'Correcto. La tibia es el hueso más frecuentemente afectado por fracturas de estrés en atletas. Las radiografías son negativas hasta 3 semanas tras el inicio de síntomas. El diagnóstico definitivo se hace con RMN. Tratamiento: reposo 4-8 semanas y bota ortopédica.'
+  },
+  {
+    patient: 'Carlos V., 45 años, carpintero',
+    mechanism: 'Accidente de tráfico — el parachoques del vehículo impactó directamente su rodilla',
+    symptoms: ['Dolor severo en rodilla', 'Hemartros (sangre dentro de la articulación)', 'Incapacidad para soportar peso', 'Inestabilidad lateral de rodilla', 'Hematoma extenso en cara lateral'],
+    xray: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Gray258.png',
+    xrayCaption: 'Vista anterior tibia y peroné — Gray\'s Anatomy 1918 · Dominio Público',
+    correct: 'Fractura de parachoques (platillo tibial)',
+    options: ['Fractura de parachoques (platillo tibial)', 'Fractura espiral de tibia', 'Fractura de Gosselin', 'Fractura de estrés'],
+    feedback: 'Correcto. La fractura de parachoques afecta el platillo tibial por impacto lateral directo en la rodilla — clásicamente el parachoques de un vehículo golpea a un peatón. El hemartros es un signo cardinal de fractura intraarticular.'
+  },
+  {
+    patient: 'Sofía K., 19 años, esquiadora',
+    mechanism: 'Caída en pista negra — el esquí actuó como palanca al girar el cuerpo con el pie fijo',
+    symptoms: ['Dolor agudo e inmediato en diáfisis tibial', 'Inflamación progresiva', 'Posible deformidad rotacional', 'Incapacidad para soportar peso', 'Equimosis que apareció horas después'],
+    xray: 'https://upload.wikimedia.org/wikipedia/commons/2/24/Gray259.png',
+    xrayCaption: 'Vista posterior tibia y peroné — Gray\'s Anatomy 1918 · Dominio Público',
+    correct: 'Fractura espiral (helicoidal)',
+    options: ['Fractura espiral (helicoidal)', 'Fractura transversal', 'Fractura de Pott', 'Fractura conminuta'],
+    feedback: 'Correcto. La fractura espiral o helicoidal es característica de los traumatismos por torsión. El trazo sigue una trayectoria helicoidal alrededor del eje del hueso. En esquiadores, el esquí actúa como palanca larga. En niños pequeños, este tipo de fractura puede ser sospechosa de maltrato.'
+  },
+  {
+    patient: 'Roberto P., 52 años, motociclista',
+    mechanism: 'Accidente de moto a alta velocidad — aplastamiento de la pierna',
+    symptoms: ['Dolor extremo en pierna', 'Deformidad grave y evidente', 'Incapacidad absoluta para mover la extremidad', 'Inflamación masiva y hematoma extenso', 'Posible fractura abierta (expuesta)'],
+    xray: 'https://upload.wikimedia.org/wikipedia/commons/0/05/Braus_1921_293.png',
+    xrayCaption: 'Sección transversal de la pierna — Braus 1921 · Dominio Público',
+    correct: 'Fractura conminuta',
+    options: ['Fractura conminuta', 'Fractura de estrés', 'Fractura en espiral', 'Fractura de Gosselin'],
+    feedback: 'Correcto. La fractura conminuta (del latín "comminuere": desmenuzar) resulta en 3 o más fragmentos óseos. Se produce por traumatismos de alta energía como accidentes de tráfico. Generalmente requiere cirugía con fijación interna y tiene mayor riesgo de complicaciones como infección y retardo de consolidación.'
+  }
+];
+
+let erState = { current: 0, score: 0, answered: false };
+
+function initMode4() {}
+
+function startER() {
+  erState = { current: 0, score: 0, answered: false };
+  document.querySelector('.er-intro').classList.add('hidden');
+  document.getElementById('er-complete').style.display = 'none';
+  document.getElementById('er-game').classList.remove('hidden');
+  renderERCase();
+}
+
+function renderERProgress() {
+  const bar = document.getElementById('er-progress-bar');
+  bar.innerHTML = '';
+  erCases.forEach((_, i) => {
+    const step = document.createElement('div');
+    step.className = 'er-step';
+    if (i < erState.current) step.classList.add('done');
+    if (i === erState.current) step.classList.add('active');
+    bar.appendChild(step);
+  });
+}
+
+function renderERCase() {
+  const c = erCases[erState.current];
+  erState.answered = false;
+  renderERProgress();
+  document.getElementById('er-case-num').textContent = erState.current + 1;
+  document.getElementById('er-score-num').textContent = erState.score;
+  document.getElementById('er-score-display').textContent = 'Score: ' + erState.score;
+  document.getElementById('er-xray').src = c.xray;
+  document.getElementById('er-xray').alt = c.xrayCaption;
+  document.getElementById('er-patient-name').textContent = c.patient;
+  document.getElementById('er-mechanism').textContent = c.mechanism;
+  const sympEl = document.getElementById('er-symptoms');
+  sympEl.innerHTML = '';
+  c.symptoms.forEach(s => {
+    const li = document.createElement('li');
+    li.textContent = s;
+    sympEl.appendChild(li);
+  });
+  const optsEl = document.getElementById('er-options');
+  optsEl.innerHTML = '';
+  const shuffledOpts = [...c.options].sort(() => Math.random() - 0.5);
+  shuffledOpts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'er-opt';
+    btn.textContent = opt;
+    btn.onclick = () => answerER(opt, c, btn, shuffledOpts, optsEl);
+    optsEl.appendChild(btn);
+  });
+  document.getElementById('er-feedback').className = 'er-feedback';
+  document.getElementById('er-feedback').textContent = '';
+  document.getElementById('er-next-btn').className = 'btn btn-primary er-next-btn';
+}
+
+function answerER(chosen, c, clickedBtn, opts, optsEl) {
+  if (erState.answered) return;
+  erState.answered = true;
+  const isCorrect = chosen === c.correct;
+  if (isCorrect) {
+    clickedBtn.classList.add('correct');
+    erState.score += 100;
+    document.getElementById('er-score-num').textContent = erState.score;
+    document.getElementById('er-score-display').textContent = 'Score: ' + erState.score;
+    toast('¡Diagnóstico correcto! +100 ✓');
+  } else {
+    clickedBtn.classList.add('wrong');
+    optsEl.querySelectorAll('.er-opt').forEach(btn => {
+      if (btn.textContent === c.correct) btn.classList.add('correct');
+    });
+    toast('Diagnóstico incorrecto ✗');
+  }
+  optsEl.querySelectorAll('.er-opt').forEach(btn => btn.disabled = true);
+  const fb = document.getElementById('er-feedback');
+  fb.innerHTML = `<strong>${isCorrect ? '✓ Correcto' : '✗ Incorrecto'}:</strong> ${c.feedback}`;
+  fb.classList.add('show');
+  document.getElementById('er-next-btn').classList.add('show');
+}
+
+function nextERCase() {
+  erState.current++;
+  if (erState.current >= erCases.length) {
+    endER();
+  } else {
+    renderERCase();
+  }
+}
+
+function endER() {
+  document.getElementById('er-game').classList.add('hidden');
+  const complete = document.getElementById('er-complete');
+  complete.style.display = 'block';
+  const score = erState.score;
+  document.getElementById('er-final-score').textContent = score;
+  let stars = '⭐';
+  let verdict = 'Sigue estudiando, interno. La tibia y el peroné tienen más secretos que revelar.';
+  if (score >= 400) { stars = '⭐⭐⭐⭐⭐'; verdict = 'Diagnóstico impecable, doctor. El departamento de ortopedia te necesita.'; }
+  else if (score >= 300) { stars = '⭐⭐⭐⭐'; verdict = 'Excelente trabajo. Pocos casos mal diagnosticados.'; }
+  else if (score >= 200) { stars = '⭐⭐⭐'; verdict = 'Buen intento. Algunos casos te costaron.'; }
+  else if (score >= 100) { stars = '⭐⭐'; verdict = 'Necesitas revisar los tipos de fractura.'; }
+  document.getElementById('er-stars').textContent = stars;
+  document.getElementById('er-verdict').textContent = verdict;
+}
+
+// ══════════════════════════════
+//  INIT
+// ══════════════════════════════
+updateHomeUI();
+</script>
+</body>
+</html>
