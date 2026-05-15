@@ -222,7 +222,27 @@
     .mode-grid, #mode1-layout, #mode2-layout, .er-case { grid-template-columns: 1fr; }
     .q-options { grid-template-columns: 1fr; }
   }
+
+  /* ── ATLAS 3D ── */
+  #screen-5 { height: 100vh; overflow: hidden; }
+  #atlas-outer { position:relative; flex:1; display:flex; min-height:0; overflow:hidden; }
+  #atlas-canvas { flex:1; display:block; touch-action:none; outline:none; }
+  #atlas-labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  #atlas-info-panel {
+    position:absolute; right:1rem; top:1rem; width:248px;
+    background:rgba(22,27,34,0.96); border:1px solid var(--border);
+    border-radius:12px; padding:1.2rem; display:none; z-index:10;
+    backdrop-filter:blur(10px);
+  }
+  .atlas-ctrl-bar { display:flex; gap:0.4rem; flex-wrap:wrap; margin-left:auto; }
+  .atlas-tbtn { padding:0.28rem 0.85rem; border-radius:7px; border:1px solid var(--border); background:var(--surface2); color:var(--text); cursor:pointer; font-size:0.76rem; font-weight:600; transition:all 0.15s; }
+  .atlas-tbtn:hover { border-color:var(--tibia); color:var(--tibia); }
+  .atlas-tbtn.fb:hover { border-color:var(--fibula); color:var(--fibula); }
+  .atlas-hint { position:absolute; bottom:0.8rem; left:50%; transform:translateX(-50%); font-size:0.7rem; color:rgba(139,148,158,0.5); pointer-events:none; white-space:nowrap; }
+  .atlas-card-bonus { max-width:700px; width:100%; margin-top:0; background:linear-gradient(135deg,rgba(74,158,255,0.08),rgba(255,107,74,0.08)); border:1px solid rgba(74,158,255,0.3); }
+  .atlas-card-bonus:hover { border-color:var(--tibia); }
 </style>
+<script defer src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 </head>
 <body>
 
@@ -263,6 +283,12 @@
       <div class="mode-desc">Médico de urgencias. Diagnostica fracturas reales con radiografías clínicas.</div>
       <div class="lock-badge" id="lock-badge">🔒 Completa modos 1-3</div>
     </div>
+  </div>
+  <div class="mode-card atlas-card-bonus" onclick="startMode(5)" id="card-5" style="margin-top:0;">
+    <div class="mode-num" style="color:var(--tibia);">Bonus — Atlas 3D</div>
+    <div class="mode-icon">🔭</div>
+    <div class="mode-name">Atlas 3D Interactivo</div>
+    <div class="mode-desc">Modelo tridimensional de tibia y peroné. Rota, acerca y haz clic en cada estructura anatómica para ver sus detalles clínicos.</div>
   </div>
   <div class="credits" style="margin-top:2rem;font-size:0.72rem;color:var(--muted);">
     Imágenes: Gray's Anatomy 1918 (dominio público) · Wikimedia Commons CC-BY-SA<br>
@@ -436,6 +462,32 @@
   </div>
 </div>
 
+<!-- ═══════════ MODE 5: ATLAS 3D ═══════════ -->
+<div id="screen-5" class="screen">
+  <div class="screen-header">
+    <button class="btn-back" onclick="goHome()">← Inicio</button>
+    <div class="screen-title">🔭 Atlas 3D — Tibia &amp; Peroné</div>
+    <div class="atlas-ctrl-bar">
+      <button class="atlas-tbtn" onclick="atlasShowBoth()">Ambos</button>
+      <button class="atlas-tbtn" onclick="atlasShowTibia()">Solo Tibia</button>
+      <button class="atlas-tbtn fb" onclick="atlasShowFibula()">Solo Peroné</button>
+      <button class="atlas-tbtn" onclick="atlasReset()">↺ Vista</button>
+    </div>
+  </div>
+  <div id="atlas-outer">
+    <canvas id="atlas-canvas"></canvas>
+    <div id="atlas-labels"></div>
+    <div id="atlas-info-panel">
+      <button onclick="document.getElementById('atlas-info-panel').style.display='none'"
+        style="position:absolute;top:0.5rem;right:0.7rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;">✕</button>
+      <div id="atlas-info-bone" style="margin-bottom:0.3rem;"></div>
+      <div id="atlas-info-title" style="font-weight:700;font-size:1rem;margin-bottom:0.7rem;line-height:1.3;"></div>
+      <div id="atlas-info-body"></div>
+    </div>
+    <div class="atlas-hint">Arrastra para rotar &nbsp;·&nbsp; Scroll para zoom &nbsp;·&nbsp; Clic en etiqueta para info</div>
+  </div>
+</div>
+
 <script>
 // ─────────────────────────────────────────
 //  STATE
@@ -448,6 +500,7 @@ const state = { completed: loadSaved(), m1Visited: new Set() };
 //  NAV
 // ─────────────────────────────────────────
 function goHome() {
+  stopAtlas();
   document.querySelectorAll('#screen-home,.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-home').classList.add('active');
   document.getElementById('screen-home').style.display = 'flex';
@@ -467,6 +520,7 @@ function startMode(n) {
   if (n === 2) initMode2();
   if (n === 3) initMode3();
   if (n === 4) initMode4();
+  if (n === 5) initMode5();
 }
 function checkER() { canPlayER() ? startMode(4) : toast('Completa los modos 1, 2 y 3 primero 🔒'); }
 function canPlayER() { return [1,2,3].every(n => state.completed.includes(n)); }
@@ -972,6 +1026,289 @@ function endER() {
   document.getElementById('er-stars').textContent = stars;
   document.getElementById('er-verdict').textContent = verdict;
 }
+
+// ─────────────────────────────────────────
+//  ATLAS 3D
+// ─────────────────────────────────────────
+let atlasScene, atlasCamera, atlasRenderer, atlasAnimId, atlasLoopFn;
+let atlasTibiaGrp, atlasFibulaGrp;
+let atlasInited = false;
+
+const ATLAS_HS = [
+  {id:'ah1', bone:'tibia',  name:'Cóndilo Medial',          pos:[-14,84,4],
+   desc:'El mayor de los dos cóndilos. Articula con el cóndilo medial del fémur y soporta ~60% de la carga de la rodilla.',
+   nota:'El cartílago articular aquí es el más grueso de toda la rodilla.'},
+  {id:'ah2', bone:'tibia',  name:'Cóndilo Lateral',         pos:[16,81,4],
+   desc:'Cóndilo menor. Tiene una faceta articular posterior oval para la cabeza del peroné (articulación tibiofibular proximal).',nota:null},
+  {id:'ah3', bone:'tibia',  name:'Platillo Tibial',         pos:[0,89,14],
+   desc:'Superficie articular superior formada por ambos cóndilos. Sobre ella descansan los meniscos y los cóndilos femorales.',
+   nota:'Sin los meniscos, la presión sobre el platillo se duplicaría.'},
+  {id:'ah4', bone:'tibia',  name:'Eminencia Intercondílea', pos:[1,97,5],
+   desc:'Dos espinas tibiales (tubérculos intercondíleos medial y lateral) entre los cóndilos. Inserción de los ligamentos cruzados.',nota:null},
+  {id:'ah5', bone:'tibia',  name:'Tuberosidad Tibial',      pos:[-6,70,17],
+   desc:'Prominencia ósea anterior palpable justo bajo la rótula. Punto de inserción del ligamento rotuliano.',
+   nota:'Enfermedad de Osgood-Schlatter: apofisitis de esta zona en adolescentes deportistas.'},
+  {id:'ah6', bone:'tibia',  name:'Cresta Anterior',         pos:[-7,22,16],
+   desc:'Borde afilado que recorre toda la cara anterior de la diáfisis. Completamente subcutáneo, sin cobertura muscular.',nota:null},
+  {id:'ah7', bone:'tibia',  name:'Cara Medial',             pos:[-20,5,3],
+   desc:'Superficie plana sin músculo encima. Única zona del esqueleto donde el hueso solo está cubierto por piel y fascia.',nota:null},
+  {id:'ah8', bone:'tibia',  name:'Borde Interóseo',         pos:[13,28,10],
+   desc:'Cresta lateral de la diáfisis tibial donde se inserta la membrana interósea que une tibia y peroné.',nota:null},
+  {id:'ah9', bone:'tibia',  name:'Maléolo Medial',          pos:[-14,-93,4],
+   desc:'Prominencia interna del tobillo. Límite medial de la mortaja del tobillo. Punto de inserción del ligamento deltoides.',
+   nota:'Fractura frecuente en esguinces graves y en la fractura bimaleolar de Pott.'},
+  {id:'ah10',bone:'tibia',  name:'Escotadura Peronea',      pos:[18,-81,0],
+   desc:'Concavidad en el extremo distal tibial donde encaja el maléolo lateral del peroné, unidas por la sindesmosis tibiofibular.',nota:null},
+  {id:'ah11',bone:'fibula', name:'Cabeza del Peroné',       pos:[42,82,4],
+   desc:'Extremo proximal redondeado. Articula con el cóndilo lateral de la tibia. El nervio peroneo común rodea el cuello justo debajo.',nota:null},
+  {id:'ah12',bone:'fibula', name:'Cuello del Peroné',       pos:[42,69,6],
+   desc:'Zona estrecha entre la cabeza y la diáfisis. El nervio peroneo común lo rodea externamente antes de bifurcarse.',
+   nota:'Fractura aquí → pie caído (foot drop): incapacidad de dorsiflexión del pie.'},
+  {id:'ah13',bone:'fibula', name:'Diáfisis Peronea',        pos:[42,10,9],
+   desc:'Cuerpo delgado y largo con 4 caras. Hueso principalmente no carga-portante. Inserción de ~9 músculos de la pierna.',nota:null},
+  {id:'ah14',bone:'fibula', name:'Cresta Interósea Peroné', pos:[34,-8,5],
+   desc:'Borde medial afilado de la diáfisis peronea. Se inserta en la membrana interósea junto al borde interóseo tibial.',nota:null},
+  {id:'ah15',bone:'fibula', name:'Maléolo Lateral',         pos:[42,-92,6],
+   desc:'Extremo distal del peroné. Se extiende ~1 cm más abajo que el maléolo medial. Límite lateral de la mortaja del tobillo.',
+   nota:'El sitio de fractura más frecuente en esguinces graves de tobillo.'},
+];
+
+function _addEllipsoid(group, mat, rx, ry, rz, x, y, z) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), mat);
+  m.scale.set(rx, ry, rz); m.position.set(x, y, z); group.add(m);
+}
+
+function _buildTibia3D() {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:0xEDE6CE, roughness:0.72, metalness:0.03 });
+  // Main shaft via LatheGeometry (revolved around Y axis)
+  const pts = [
+    [5,-97],[9,-92],[14,-82],[13,-64],[11,-40],[10,0],
+    [11,40],[13,64],[18,72],[26,81],[30,88],[27,93],[18,96]
+  ].map(([r,y]) => new THREE.Vector2(r, y));
+  const sg = new THREE.LatheGeometry(pts, 32);
+  sg.scale(0.78, 1, 1.12);
+  g.add(new THREE.Mesh(sg, mat));
+  _addEllipsoid(g, mat, 19, 10, 21, -12, 83, 2);  // medial condyle (larger)
+  _addEllipsoid(g, mat, 15,  9, 17,  16, 81, 2);  // lateral condyle (smaller)
+  // Intercondylar eminence (tibial spines)
+  const c1 = new THREE.Mesh(new THREE.ConeGeometry(2.5, 8, 10), mat);
+  c1.position.set(-1, 97, 4); g.add(c1);
+  const c2 = new THREE.Mesh(new THREE.ConeGeometry(2, 6, 10), mat);
+  c2.position.set(4, 96, 4); g.add(c2);
+  _addEllipsoid(g, mat,  6,  9,  6, -5,  70, 17); // tibial tuberosity
+  _addEllipsoid(g, mat,  7, 13,  7,-13, -92,  3); // medial malleolus
+  return g;
+}
+
+function _buildFibula3D() {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:0xF0EBD6, roughness:0.72, metalness:0.03 });
+  const pts = [
+    [4,-100],[8.5,-90],[9,-83],[5,-68],[4,-40],
+    [3.8,0],[4,40],[5,63],[7,70],[11,77],[12,82],[10,86]
+  ].map(([r,y]) => new THREE.Vector2(r, y));
+  const sg = new THREE.LatheGeometry(pts, 24);
+  sg.scale(0.9, 1, 1.0);
+  g.add(new THREE.Mesh(sg, mat));
+  _addEllipsoid(g, mat, 11, 8, 12, 0,  82, 1); // head of fibula
+  _addEllipsoid(g, mat,  8,12,  8, 0, -90, 4); // lateral malleolus
+  g.position.x = 42;
+  return g;
+}
+
+function stopAtlas() {
+  if (atlasAnimId) { cancelAnimationFrame(atlasAnimId); atlasAnimId = null; }
+}
+
+function initMode5() {
+  if (typeof THREE === 'undefined') {
+    toast('Cargando motor 3D, intenta en 2 segundos...');
+    return;
+  }
+  const outer = document.getElementById('atlas-outer');
+  const w = outer.clientWidth  || window.innerWidth;
+  const h = outer.clientHeight || (window.innerHeight - 64);
+
+  if (!atlasInited) {
+    atlasInited = true;
+    const canvas = document.getElementById('atlas-canvas');
+
+    atlasScene = new THREE.Scene();
+    atlasScene.background = new THREE.Color(0x0d1117);
+
+    atlasCamera = new THREE.PerspectiveCamera(38, w / h, 0.5, 2000);
+
+    atlasRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    atlasRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    atlasRenderer.setSize(w, h);
+
+    // Lighting
+    atlasScene.add(new THREE.AmbientLight(0xffffff, 0.48));
+    const kl = new THREE.DirectionalLight(0xfff8ee, 1.1);
+    kl.position.set(60, 120, 90); atlasScene.add(kl);
+    const fl = new THREE.DirectionalLight(0xc0d8ff, 0.4);
+    fl.position.set(-60, 30, 40); atlasScene.add(fl);
+    const rl = new THREE.DirectionalLight(0x304080, 0.3);
+    rl.position.set(0, -120, -80); atlasScene.add(rl);
+
+    // Bones
+    atlasTibiaGrp  = _buildTibia3D();  atlasScene.add(atlasTibiaGrp);
+    atlasFibulaGrp = _buildFibula3D(); atlasScene.add(atlasFibulaGrp);
+
+    // Interosseous membrane (translucent plane between bones)
+    const mem = new THREE.Mesh(
+      new THREE.PlaneGeometry(18, 145),
+      new THREE.MeshStandardMaterial({
+        color:0xC0A878, transparent:true, opacity:0.16,
+        side:THREE.DoubleSide, roughness:1, depthWrite:false
+      })
+    );
+    mem.position.set(21, -3, 0); atlasScene.add(mem);
+
+    // Hotspot spheres
+    ATLAS_HS.forEach(h => {
+      const color = h.bone === 'tibia' ? 0x4a9eff : 0xff6b4a;
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(3.5, 12, 10),
+        new THREE.MeshStandardMaterial({ color, emissive:color, emissiveIntensity:0.4, roughness:0.3 })
+      );
+      mesh.position.set(...h.pos);
+      atlasScene.add(mesh);
+    });
+
+    // HTML labels overlay
+    const labelsEl = document.getElementById('atlas-labels');
+    labelsEl.innerHTML = '';
+    ATLAS_HS.forEach(h => {
+      const d = document.createElement('div');
+      d.id = 'albl-' + h.id;
+      const c = h.bone === 'tibia' ? '#4a9eff' : '#ff6b4a';
+      d.style.cssText = `position:absolute;font-size:0.68rem;line-height:1.2;
+        background:rgba(13,17,23,0.84);border:1px solid ${c};border-radius:4px;
+        padding:2px 8px;white-space:nowrap;cursor:pointer;pointer-events:auto;
+        color:#e6edf3;transition:opacity 0.15s;`;
+      d.textContent = h.name;
+      d.onclick = () => showAtlasInfo(h);
+      labelsEl.appendChild(d);
+    });
+
+    // Orbit controls (hand-written — no external dependency)
+    const target = new THREE.Vector3(21, 0, 0);
+    let theta = 0.3, phi = Math.PI / 2 - 0.05, radius = 290;
+    let dragging = false, px = 0, py = 0;
+
+    function _updateCam() {
+      atlasCamera.position.set(
+        target.x + radius * Math.sin(phi) * Math.cos(theta),
+        target.y + radius * Math.cos(phi),
+        target.z + radius * Math.sin(phi) * Math.sin(theta)
+      );
+      atlasCamera.lookAt(target);
+    }
+    _updateCam();
+
+    canvas.addEventListener('mousedown', e => { dragging = true; px = e.clientX; py = e.clientY; });
+    window.addEventListener('mouseup', () => { dragging = false; });
+    window.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      theta -= (e.clientX - px) * 0.005;
+      phi = Math.max(0.08, Math.min(Math.PI - 0.08, phi + (e.clientY - py) * 0.005));
+      px = e.clientX; py = e.clientY;
+      _updateCam();
+    });
+    canvas.addEventListener('wheel', e => {
+      radius = Math.max(90, Math.min(520, radius + e.deltaY * 0.25));
+      _updateCam(); e.preventDefault();
+    }, { passive: false });
+
+    // Touch support
+    let ltouches = [], ldist = 0;
+    canvas.addEventListener('touchstart', e => {
+      ltouches = Array.from(e.touches);
+      if (ltouches.length === 1) { px = ltouches[0].clientX; py = ltouches[0].clientY; }
+      if (ltouches.length === 2) {
+        ldist = Math.hypot(ltouches[1].clientX - ltouches[0].clientX, ltouches[1].clientY - ltouches[0].clientY);
+      }
+    });
+    canvas.addEventListener('touchmove', e => {
+      const tc = Array.from(e.touches);
+      if (tc.length === 1) {
+        theta -= (tc[0].clientX - px) * 0.005;
+        phi = Math.max(0.08, Math.min(Math.PI - 0.08, phi + (tc[0].clientY - py) * 0.005));
+        px = tc[0].clientX; py = tc[0].clientY;
+      } else if (tc.length === 2) {
+        const d = Math.hypot(tc[1].clientX - tc[0].clientX, tc[1].clientY - tc[0].clientY);
+        radius = Math.max(90, Math.min(520, radius * (ldist / d)));
+        ldist = d;
+      }
+      _updateCam(); e.preventDefault();
+    }, { passive: false });
+
+    // Expose reset
+    window._atlasReset = () => { theta = 0.3; phi = Math.PI / 2 - 0.05; radius = 290; _updateCam(); };
+
+    // Label projection
+    function _updateLabels() {
+      const rect = canvas.getBoundingClientRect();
+      const W = rect.width, H = rect.height;
+      ATLAS_HS.forEach(h => {
+        const el = document.getElementById('albl-' + h.id);
+        if (!el) return;
+        const v = new THREE.Vector3(...h.pos).project(atlasCamera);
+        const sx = (v.x + 1) / 2 * W;
+        const sy = (-v.y + 1) / 2 * H;
+        if (v.z > 1 || sx < 0 || sx > W || sy < 0 || sy > H) {
+          el.style.opacity = '0';
+        } else {
+          el.style.opacity = '1';
+          el.style.left = (sx + 9) + 'px';
+          el.style.top  = (sy - 11) + 'px';
+        }
+      });
+    }
+
+    atlasLoopFn = function loop() {
+      atlasAnimId = requestAnimationFrame(loop);
+      atlasRenderer.render(atlasScene, atlasCamera);
+      _updateLabels();
+    };
+
+    window.addEventListener('resize', () => {
+      const o = document.getElementById('atlas-outer');
+      if (!o || !atlasCamera) return;
+      const nw = o.clientWidth, nh = o.clientHeight;
+      if (!nw || !nh) return;
+      atlasCamera.aspect = nw / nh;
+      atlasCamera.updateProjectionMatrix();
+      atlasRenderer.setSize(nw, nh);
+    });
+
+  } else {
+    // Re-entering: resize and restart
+    atlasCamera.aspect = w / h;
+    atlasCamera.updateProjectionMatrix();
+    atlasRenderer.setSize(w, h);
+  }
+
+  atlasLoopFn();
+}
+
+function showAtlasInfo(h) {
+  const color = h.bone === 'tibia' ? '#4a9eff' : '#ff6b4a';
+  document.getElementById('atlas-info-bone').innerHTML =
+    `<span style="color:${color};font-weight:700;font-size:0.72rem;letter-spacing:1.5px;">${h.bone === 'tibia' ? 'TIBIA' : 'PERONÉ'}</span>`;
+  document.getElementById('atlas-info-title').textContent = h.name;
+  document.getElementById('atlas-info-body').innerHTML =
+    `<p style="color:var(--muted);font-size:0.85rem;line-height:1.55;">${h.desc}</p>` +
+    (h.nota ? `<div style="margin-top:0.65rem;font-size:0.8rem;background:rgba(210,153,34,0.1);border-left:3px solid var(--yellow);padding:0.5rem 0.7rem;border-radius:0 6px 6px 0;">⚕️ ${h.nota}</div>` : '');
+  document.getElementById('atlas-info-panel').style.display = 'block';
+}
+
+function atlasShowBoth()   { if (atlasTibiaGrp) atlasTibiaGrp.visible = true;  if (atlasFibulaGrp) atlasFibulaGrp.visible = true; }
+function atlasShowTibia()  { if (atlasTibiaGrp) atlasTibiaGrp.visible = true;  if (atlasFibulaGrp) atlasFibulaGrp.visible = false; }
+function atlasShowFibula() { if (atlasTibiaGrp) atlasTibiaGrp.visible = false; if (atlasFibulaGrp) atlasFibulaGrp.visible = true; }
+function atlasReset()      { if (window._atlasReset) window._atlasReset(); }
 
 // INIT
 updateHomeUI();
